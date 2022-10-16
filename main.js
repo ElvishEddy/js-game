@@ -1,9 +1,9 @@
 const loadCanvas = () => {
   const canvas = document.getElementById("canvas1");
   const ctx = canvas.getContext("2d");
-  canvas.width = 500;
+  canvas.width = 700;
   canvas.height = 500;
-
+  0;
   class InputHandler {
     constructor(game) {
       this.game = game;
@@ -16,6 +16,8 @@ const loadCanvas = () => {
           this.game.keys.push(e.key);
         } else if (e.key === " ") {
           this.game.player.shootTop();
+        } else if (e.key === "d") {
+          this.game.debug = !this.game.debug;
         }
       });
 
@@ -60,9 +62,13 @@ const loadCanvas = () => {
       this.height = 190;
       this.x = 20;
       this.y = 100;
+      this.frameX = 0;
+      this.frameY = 1;
+      this.maxFrame = 37;
       this.speedY = 0;
       this.maxSpeed = 3;
       this.projectitles = [];
+      this.image = document.getElementById("player");
     }
 
     update() {
@@ -85,11 +91,28 @@ const loadCanvas = () => {
     }
 
     draw(context) {
-      context.fillStyle = "black";
-      context.fillRect(this.x, this.y, this.width, this.height);
+      if (this.game.debug)
+        context.strokeRect(this.x, this.y, this.width, this.height);
+      context.drawImage(
+        this.image,
+        this.frameX * this.width,
+        this.frameY * this.height,
+        this.width,
+        this.height,
+        this.x,
+        this.y,
+        this.width,
+        this.height
+      );
       this.projectitles.forEach((projectitle) => {
         projectitle.draw(context);
       });
+
+      if (this.frameX < this.maxFrame) {
+        this.frameX++;
+      } else {
+        this.frameX = 0;
+      }
     }
 
     shootTop() {
@@ -108,21 +131,37 @@ const loadCanvas = () => {
       this.x = this.game.width;
       this.speedX = Math.random() * -1.5 - 0.5;
       this.markedForDeletion = false;
-      this.lives = 5;
-      this.score = this.lives;
+      this.frameX = 0;
+      this.frameY = 0;
+      this.maxFrame = 37;
     }
 
     update() {
-      this.x += this.speedX;
+      this.x += this.speedX - this.game.speed;
       if (this.x + this.width < 0) {
         this.markedForDeletion = true;
       }
     }
 
     draw(context) {
-      context.fillStyle = "red";
-      context.fillRect(this.x, this.y, this.width, this.height);
-      context.fillStyle = "white";
+      if (this.game.debug)
+        context.strokeRect(this.x, this.y, this.width, this.height);
+      context.drawImage(
+        this.image,
+        this.frameX * this.width,
+        this.frameY * this.height,
+        this.width,
+        this.height,
+        this.x,
+        this.y,
+        this.width,
+        this.height
+      );
+      if (this.frameX < this.maxFrame) {
+        this.frameX++;
+      } else {
+        this.frameX = 0;
+      }
       context.font = "20px Helvetic";
       context.fillText(this.lives, this.x, this.y);
     }
@@ -131,9 +170,26 @@ const loadCanvas = () => {
   class Angeler1 extends Enemy {
     constructor(game) {
       super(game);
-      this.width = 228 * 0.2;
-      this.height = 169 * 0.2;
+      this.width = 228;
+      this.height = 169;
       this.y = Math.random() * (this.game.height * 0.9 - this.height);
+      this.image = document.getElementById("angler1");
+      this.frameY = Math.floor(Math.random() * 3);
+      this.lives = 2;
+      this.score = this.lives;
+    }
+  }
+
+  class Angeler2 extends Enemy {
+    constructor(game) {
+      super(game);
+      this.width = 213;
+      this.height = 165;
+      this.y = Math.random() * (this.game.height * 0.9 - this.height);
+      this.image = document.getElementById("angler2");
+      this.frameY = Math.floor(Math.random() * 2);
+      this.lives = 3;
+      this.score = this.lives;
     }
   }
 
@@ -258,8 +314,9 @@ const loadCanvas = () => {
       this.score = 0;
       this.winningScore = 10;
       this.gameTime = 0;
-      this.timeLimit = 5000;
+      this.timeLimit = 15000;
       this.speed = 1;
+      this.debug = true;
     }
 
     update(deltaTime) {
@@ -317,7 +374,9 @@ const loadCanvas = () => {
     }
 
     addEnemy() {
-      this.enemies.push(new Angeler1(this));
+      const radomize = Math.random();
+      if (radomize < 0.5) this.enemies.push(new Angeler1(this));
+      else this.enemies.push(new Angeler2(this));
     }
 
     checkCollision(rect1, rect2) {
