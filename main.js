@@ -38,6 +38,7 @@ const loadCanvas = () => {
       this.height = 3;
       this.speed = 3;
       this.markedForDeletion = false;
+      this.image = document.getElementById("projecttile");
     }
 
     update() {
@@ -48,12 +49,67 @@ const loadCanvas = () => {
     }
 
     draw(context) {
-      context.fillStyle = "yellow";
-      context.fillRect(this.x, this.y, this.width, this.height);
+      context.drawImage(this.image, this.x, this.y);
     }
   }
 
-  class Practicle {}
+  class Practicle {
+    constructor(game, x, y) {
+      this.game = game;
+      this.x = x;
+      this.y = y;
+      this.image = document.getElementById("gears");
+      this.frameX = Math.floor(Math.random() * 3);
+      this.frameY = Math.floor(Math.random() * 3);
+      this.spriteSize = 50;
+      this.sizeModifier = (Math.random() * 0.5 + 0.5).toFixed(1);
+      this.size = this.spriteSize * this.sizeModifier;
+      this.speedX = Math.random() * 6 - 3;
+      this.speedY = Math.random() * -15;
+      this.gravity = 0.5;
+      this.markedForDeletion = false;
+      this.angle = 0;
+      this.va = Math.random() * 0.2 - 0.1;
+      this.bounced = 0;
+      this.bottomBounceBoundary = Math.random() * 100 + 60;
+    }
+
+    update() {
+      this.angle += this.va;
+      this.speedY += this.gravity;
+      this.x -= this.speedX + this.game.speed;
+      this.y += this.speedY;
+      if (this.y > this.game.height + this.size || this.x < 0 - this.size) {
+        this.markedForDeletion = true;
+      }
+
+      if (
+        this.y > this.game.height - this.bottomBounceBoundary &&
+        this.bounced < 2
+      ) {
+        this.bounced = true;
+        this.speedY *= -0.5;
+      }
+    }
+
+    draw(context) {
+      context.save();
+      context.translate(this.x, this.y);
+      context.rotate(this.angle);
+      context.drawImage(
+        this.image,
+        this.frameX * this.spriteSize,
+        this.frameY * this.spriteSize,
+        this.spriteSize,
+        this.spriteSize,
+        this.size * -0.5,
+        this.size * -0.5,
+        this.size,
+        this.size
+      );
+      context.restore();
+    }
+  }
 
   class Player {
     constructor(game) {
@@ -69,9 +125,12 @@ const loadCanvas = () => {
       this.maxSpeed = 3;
       this.projectitles = [];
       this.image = document.getElementById("player");
+      this.powerUp = false;
+      this.powerUpLimit = 10000;
+      this.powerUpTimer = 0;
     }
 
-    update() {
+    update(deltaTime) {
       if (this.game.keys.includes("ArrowUp")) {
         this.speedY = -this.maxSpeed;
       } else if (this.game.keys.includes("ArrowDown")) {
@@ -81,6 +140,11 @@ const loadCanvas = () => {
       }
       this.y += this.speedY;
 
+      // Vertical Boundaries
+      if (this.y > this.game.height - this.height * 0.5)
+        this.y = this.game.height - this.height * 0.5;
+
+      if (this.y < -this.height * 0.5) this.y = -this.height * 0.5;
       this.projectitles.forEach((projectitle) => {
         projectitle.update();
       });
@@ -88,11 +152,26 @@ const loadCanvas = () => {
       this.projectitles = this.projectitles.filter(
         (projectitle) => !projectitle.markedForDeletion
       );
+
+      if (this.powerUp) {
+        if (this.powerUpTimer > this.powerUpLimit) {
+          this.powerUpTimer = 0;
+          this.powerUp = false;
+          this.frameY = 0;
+        } else {
+          this.powerUpTimer += deltaTime;
+          this.frameY = 1;
+          this.game.ammo += 0.1;
+        }
+      }
     }
 
     draw(context) {
       if (this.game.debug)
         context.strokeRect(this.x, this.y, this.width, this.height);
+      this.projectitles.forEach((projectitle) => {
+        projectitle.draw(context);
+      });
       context.drawImage(
         this.image,
         this.frameX * this.width,
@@ -104,9 +183,6 @@ const loadCanvas = () => {
         this.width,
         this.height
       );
-      this.projectitles.forEach((projectitle) => {
-        projectitle.draw(context);
-      });
 
       if (this.frameX < this.maxFrame) {
         this.frameX++;
@@ -122,6 +198,22 @@ const loadCanvas = () => {
         );
         this.game.ammo--;
       }
+      if (this.powerUp) this.shootBottom();
+    }
+
+    shootBottom() {
+      if (this.game.ammo > 0) {
+        this.projectitles.push(
+          new Projectitle(this.game, this.x + 80, this.y + 175)
+        );
+      }
+    }
+
+    enterPowerUp() {
+      this.powerUpTimer = 0;
+      this.powerUp = true;
+      if (this.game.ammo < this.game.maxAmmo)
+        this.game.ammo = this.game.maxAmmo;
     }
   }
 
@@ -162,8 +254,10 @@ const loadCanvas = () => {
       } else {
         this.frameX = 0;
       }
-      context.font = "20px Helvetic";
-      context.fillText(this.lives, this.x, this.y);
+      if (this.game.debug) {
+        context.font = "20px Helvetica";
+        context.fillText(this.lives, this.x, this.y);
+      }
     }
   }
 
@@ -172,7 +266,7 @@ const loadCanvas = () => {
       super(game);
       this.width = 228;
       this.height = 169;
-      this.y = Math.random() * (this.game.height * 0.9 - this.height);
+      this.y = Math.random() * (this.game.height * 0.95 - this.height);
       this.image = document.getElementById("angler1");
       this.frameY = Math.floor(Math.random() * 3);
       this.lives = 2;
@@ -185,11 +279,56 @@ const loadCanvas = () => {
       super(game);
       this.width = 213;
       this.height = 165;
-      this.y = Math.random() * (this.game.height * 0.9 - this.height);
+      this.y = Math.random() * (this.game.height * 0.95 - this.height);
       this.image = document.getElementById("angler2");
       this.frameY = Math.floor(Math.random() * 2);
       this.lives = 3;
       this.score = this.lives;
+    }
+  }
+
+  class LuckyFish extends Enemy {
+    constructor(game) {
+      super(game);
+      this.width = 99;
+      this.height = 95;
+      this.y = Math.random() * (this.game.height * 0.95 - this.height);
+      this.image = document.getElementById("lucky");
+      this.frameY = Math.floor(Math.random() * 2);
+      this.lives = 3;
+      this.score = 15;
+      this.type = "lucky";
+    }
+  }
+
+  class HiveWhale extends Enemy {
+    constructor(game) {
+      super(game);
+      this.width = 400;
+      this.height = 227;
+      this.y = Math.random() * (this.game.height * 0.95 - this.height);
+      this.image = document.getElementById("hivewhale");
+      this.frameY = 0;
+      this.lives = 15;
+      this.score = this.lives;
+      this.type = "hive";
+      this.speedX = Math.random() * -1.2 - 0.2;
+    }
+  }
+
+  class Drone extends Enemy {
+    constructor(game, x, y) {
+      super(game);
+      this.width = 115;
+      this.height = 95;
+      this.x = x;
+      this.y = y;
+      this.image = document.getElementById("drone");
+      this.frameY = Math.floor(Math.random() * 2);
+      this.lives = 3;
+      this.score = this.lives;
+      this.type = "drone";
+      this.speedX = Math.random() * -4.2 - 0.5;
     }
   }
 
@@ -243,7 +382,7 @@ const loadCanvas = () => {
     constructor(game) {
       this.game = game;
       this.fontSize = 25;
-      this.fontFamily = "Helvetica";
+      this.fontFamily = "Bangers";
       this.color = "white";
     }
 
@@ -256,10 +395,7 @@ const loadCanvas = () => {
       context.font = this.fontSize + "px" + this.fontFamily;
       // Score
       context.fillText("Score:" + this.game.score, 20, 40);
-      // Ammo
-      for (let i = 0; i < this.game.ammo; i++) {
-        context.fillRect(20 + 5 * i, 50, 3, 20);
-      }
+
       // Timer
       const formattedTime = (this.game.gameTime * 0.001).toFixed(1);
       context.fillText("Timer:" + formattedTime, 20, 100);
@@ -290,6 +426,11 @@ const loadCanvas = () => {
           this.game.height * 0.5 + 40
         );
       }
+      // Ammo
+      if (this.game.player.powerUp) context.fillStyle = "orange";
+      for (let i = 0; i < this.game.ammo; i++) {
+        context.fillRect(20 + 5 * i, 50, 3, 20);
+      }
       context.restore();
     }
   }
@@ -304,6 +445,7 @@ const loadCanvas = () => {
       this.ui = new UI(this);
       this.keys = [];
       this.enemies = [];
+      this.practicles = [];
       this.ammo = 20;
       this.maxAmmo = 50;
       this.ammoTimer = 0;
@@ -324,7 +466,7 @@ const loadCanvas = () => {
       if (this.gameTime > this.timeLimit) this.gameOver = true;
       this.background.update();
       this.background.layer4.update();
-      this.player.update();
+      this.player.update(deltaTime);
       if (this.ammoTimer > this.ammoInterval) {
         if (this.ammo < this.maxAmmo) {
           this.ammo++;
@@ -335,17 +477,60 @@ const loadCanvas = () => {
         this.ammoTimer += deltaTime;
       }
 
+      this.practicles.forEach((practicle) => practicle.update());
+      this.practicles = this.practicles.filter(
+        (practicle) => !practicle.markedForDeletion
+      );
+
       this.enemies.forEach((enemy) => {
         enemy.update();
         if (this.checkCollision(this.player, enemy)) {
           enemy.markedForDeletion = true;
+          for (let i = 0; i < enemy.score; i++) {
+            this.practicles.push(
+              new Practicle(
+                this,
+                enemy.x + enemy.width * 0.5,
+                enemy.y + enemy.height * 0.5
+              )
+            );
+          }
+          if (enemy.type === "lucky") this.player.enterPowerUp();
+          else this.score--;
         }
         this.player.projectitles.forEach((projectitle) => {
           if (this.checkCollision(projectitle, enemy)) {
             enemy.lives--;
             projectitle.markedForDeletion = true;
+            this.practicles.push(
+              new Practicle(
+                this,
+                enemy.x + enemy.width * 0.5,
+                enemy.y + enemy.height * 0.5
+              )
+            );
             if (enemy.lives <= 0) {
+              for (let i = 0; i < enemy.score; i++) {
+                this.practicles.push(
+                  new Practicle(
+                    this,
+                    enemy.x + enemy.width * 0.5,
+                    enemy.y + enemy.height * 0.5
+                  )
+                );
+              }
               enemy.markedForDeletion = true;
+              if (enemy.type === "hive") {
+                for (let i = 0; i < 5; i++) {
+                  this.enemies.push(
+                    new Drone(
+                      this,
+                      enemy.x + Math.random() * enemy.width,
+                      enemy.y + Math.random() * enemy.height * 0.5
+                    )
+                  );
+                }
+              }
               if (!this.gameOver) this.score += enemy.score;
               if (this.score > this.winningScore) this.gameOver = true;
             }
@@ -365,8 +550,9 @@ const loadCanvas = () => {
 
     draw(context) {
       this.background.draw(context);
-      this.player.draw(context);
       this.ui.draw(context);
+      this.player.draw(context);
+      this.practicles.forEach((practicle) => practicle.draw(context));
       this.enemies.forEach((enemy) => {
         enemy.draw(context);
       });
@@ -374,9 +560,11 @@ const loadCanvas = () => {
     }
 
     addEnemy() {
-      const radomize = Math.random();
-      if (radomize < 0.5) this.enemies.push(new Angeler1(this));
-      else this.enemies.push(new Angeler2(this));
+      const randomize = Math.random();
+      if (randomize < 0.3) this.enemies.push(new Angeler1(this));
+      else if (randomize < 0.6) this.enemies.push(new Angeler2(this));
+      else if (randomize < 0.8) this.enemies.push(new HiveWhale(this));
+      else this.enemies.push(new LuckyFish(this));
     }
 
     checkCollision(rect1, rect2) {
