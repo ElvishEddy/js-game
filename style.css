@@ -27,6 +27,8 @@
 #projecttile,
 #gears,
 #hivewhale,
-#drone {
+#drone,
+#smoke,
+#fire {
   display: none;
 }

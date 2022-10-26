@@ -1,7 +1,7 @@
 const loadCanvas = () => {
   const canvas = document.getElementById("canvas1");
   const ctx = canvas.getContext("2d");
-  canvas.width = 700;
+  canvas.width = 1000;
   canvas.height = 500;
   0;
   class InputHandler {
@@ -378,6 +378,64 @@ const loadCanvas = () => {
     }
   }
 
+  class Explosion {
+    constructor(game, x, y) {
+      this.game = game;
+      this.frameX = 0;
+      this.spriteWidth = 200;
+      this.spriteHeight = 200;
+      this.width = this.spriteWidth;
+      this.height = this.spriteHeight;
+      this.x = x - this.width * 0.5;
+      this.y = y - this.height * 0.5;
+      this.fps = 30;
+      this.timer = 0;
+      this.interval = 1000 / this.fps;
+      this.markedForDeletion = false;
+      this.maxFrame = 8;
+    }
+
+    update(deltaTime) {
+      this.x -= this.game.speed;
+      if (this.timer > this.interval) {
+        this.frameX++;
+        this.timer = 0;
+      } else {
+        this.timer += deltaTime;
+      }
+
+      if (this.frameX > this.maxFrame) this.markedForDeletion = true;
+    }
+
+    draw(context) {
+      context.drawImage(
+        this.image,
+        this.frameX * this.spriteWidth,
+        0,
+        this.spriteWidth,
+        this.spriteHeight,
+        this.x,
+        this.y,
+        this.width,
+        this.height
+      );
+    }
+  }
+
+  class SmokeExplosion extends Explosion {
+    constructor(game, x, y) {
+      super(game, x, y);
+      this.image = document.getElementById("smoke");
+    }
+  }
+
+  class FireExplosion extends Explosion {
+    constructor(game, x, y) {
+      super(game, x, y);
+      this.image = document.getElementById("fire");
+    }
+  }
+
   class UI {
     constructor(game) {
       this.game = game;
@@ -446,17 +504,18 @@ const loadCanvas = () => {
       this.keys = [];
       this.enemies = [];
       this.practicles = [];
+      this.explosions = [];
       this.ammo = 20;
       this.maxAmmo = 50;
       this.ammoTimer = 0;
-      this.ammoInterval = 500;
+      this.ammoInterval = 350;
       this.enemyTimer = 0;
-      this.enemyInterval = 1000;
+      this.enemyInterval = 2000;
       this.gameOver = false;
       this.score = 0;
-      this.winningScore = 10;
+      this.winningScore = 80;
       this.gameTime = 0;
-      this.timeLimit = 15000;
+      this.timeLimit = 30000;
       this.speed = 1;
       this.debug = true;
     }
@@ -482,10 +541,16 @@ const loadCanvas = () => {
         (practicle) => !practicle.markedForDeletion
       );
 
+      this.explosions.forEach((explosion) => explosion.update(deltaTime));
+      this.explosions = this.explosions.filter(
+        (explosion) => !explosion.markedForDeletion
+      );
+
       this.enemies.forEach((enemy) => {
         enemy.update();
         if (this.checkCollision(this.player, enemy)) {
           enemy.markedForDeletion = true;
+          this.addExplosion(enemy);
           for (let i = 0; i < enemy.score; i++) {
             this.practicles.push(
               new Practicle(
@@ -496,7 +561,7 @@ const loadCanvas = () => {
             );
           }
           if (enemy.type === "lucky") this.player.enterPowerUp();
-          else this.score--;
+          else if(!this.gameOver) this.score--;
         }
         this.player.projectitles.forEach((projectitle) => {
           if (this.checkCollision(projectitle, enemy)) {
@@ -520,6 +585,7 @@ const loadCanvas = () => {
                 );
               }
               enemy.markedForDeletion = true;
+              this.addExplosion(enemy);
               if (enemy.type === "hive") {
                 for (let i = 0; i < 5; i++) {
                   this.enemies.push(
@@ -556,6 +622,9 @@ const loadCanvas = () => {
       this.enemies.forEach((enemy) => {
         enemy.draw(context);
       });
+      this.explosions.forEach((explosion) => {
+        explosion.draw(context);
+      });
       this.background.layer4.draw(context);
     }
 
@@ -565,6 +634,29 @@ const loadCanvas = () => {
       else if (randomize < 0.6) this.enemies.push(new Angeler2(this));
       else if (randomize < 0.8) this.enemies.push(new HiveWhale(this));
       else this.enemies.push(new LuckyFish(this));
+    }
+
+    addExplosion(enemy) {
+      const randomize = Math.random();
+      if (randomize < 0.5) {
+        this.explosions.push(
+          new SmokeExplosion(
+            this,
+            enemy.x + enemy.width * 0.5,
+            enemy.y + enemy.height * 0.5
+          )
+        );
+      } else {
+        this.explosions.push(
+          new FireExplosion(
+            this,
+            enemy.x + enemy.width * 0.5,
+            enemy.y + enemy.height * 0.5
+          )
+        );
+      }
+
+      console.log(this.explosions);
     }
 
     checkCollision(rect1, rect2) {
@@ -583,8 +675,8 @@ const loadCanvas = () => {
     const deltaTime = timeStamp - lastTime;
     lastTime = timeStamp;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    game.update(deltaTime);
     game.draw(ctx);
+    game.update(deltaTime);
     requestAnimationFrame(animate);
   };
 
